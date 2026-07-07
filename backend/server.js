@@ -9,31 +9,66 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MySQL connection pool
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || 'mysql',
+  user: process.env.DB_USER || 'quizuser',
+  password: process.env.DB_PASSWORD || 'quizpassword',
+  database: process.env.DB_NAME || 'quiz_portal',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 });
 
-// Make pool available to routes
 app.locals.pool = pool;
 
-// Routes
+(async () => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('✅ Database connected successfully');
+    connection.release();
+  } catch (error) {
+    console.error('❌ Database connection failed:', error.message);
+  }
+})();
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/quizzes', require('./routes/quizzes'));
 app.use('/api/questions', require('./routes/questions'));
 app.use('/api/attempts', require('./routes/attempts'));
 
-// Error handler
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    service: 'quiz-backend',
+    database: process.env.DB_NAME || 'quiz_portal'
+  });
+});
+
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Quiz Portal API is running',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      quizzes: '/api/quizzes',
+      questions: '/api/questions',
+      attempts: '/api/attempts'
+    }
+  });
+});
+
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: 'Server error', error: err.message });
+  console.error('Error:', err.message);
+  res.status(500).json({ 
+    success: false,
+    message: 'Server error', 
+    error: err.message 
+  });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Using database: ${process.env.DB_NAME || 'quiz_portal'}`);
+});
