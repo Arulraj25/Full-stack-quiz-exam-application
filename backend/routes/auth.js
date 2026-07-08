@@ -13,11 +13,12 @@ function isDbReady(req) {
   return req.app.locals.dbReady || false;
 }
 
+// ✅ REGISTER
 router.post('/register', async (req, res) => {
   const pool = getPool(req);
   const { name, email, password } = req.body;
 
-  // ✅ Validate input
+  // Validate input
   if (!name || !email || !password) {
     return res.status(400).json({ 
       success: false,
@@ -25,7 +26,7 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  // ✅ Check database readiness
+  // Check database readiness
   if (!isDbReady(req)) {
     return res.status(503).json({
       success: false,
@@ -79,11 +80,12 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// ✅ LOGIN
 router.post('/login', async (req, res) => {
   const pool = getPool(req);
   const { email, password } = req.body;
 
-  // ✅ Validate input
+  // Validate input
   if (!email || !password) {
     return res.status(400).json({ 
       success: false,
@@ -91,7 +93,7 @@ router.post('/login', async (req, res) => {
     });
   }
 
-  // ✅ Check database readiness
+  // Check database readiness
   if (!isDbReady(req)) {
     return res.status(503).json({
       success: false,

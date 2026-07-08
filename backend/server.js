@@ -13,17 +13,18 @@ app.use(express.json());
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'mysql',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'password',
+  password: process.env.DB_PASSWORD || 'Arul_2025',
   database: process.env.DB_NAME || 'quiz_portal',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  connectTimeout: 30000
 });
 
 app.locals.pool = pool;
 app.locals.dbReady = false;
 
-// ✅ Database connection with retry (works everywhere)
+// ✅ Database connection with retry
 async function connectWithRetry(retries = 30, delay = 2000) {
   console.log('🔄 Waiting for MySQL to be ready...');
   
@@ -40,7 +41,6 @@ async function connectWithRetry(retries = 30, delay = 2000) {
         console.error('❌ Failed to connect to MySQL after all retries');
         console.error('Error:', error.message);
         app.locals.dbReady = false;
-        // Don't exit - keep server running, but mark as not ready
         return false;
       }
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -113,7 +113,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ 
     success: false,
     message: 'Server error', 
-    error: err.message 
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
 });
 
