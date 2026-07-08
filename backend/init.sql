@@ -1,4 +1,4 @@
--- Quiz Portal Database Schema - FIXED
+-- Quiz Portal Database Schema
 CREATE DATABASE IF NOT EXISTS quiz_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE quiz_portal;
 
@@ -54,5 +54,3 @@ CREATE TABLE IF NOT EXISTS answers (
 
 INSERT IGNORE INTO users (name, email, password_hash, role) VALUES
 ('Admin User', 'admin@quizportal.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
-
-SELECT '✅ Tables created successfully!' AS Status;
