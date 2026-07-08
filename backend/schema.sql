@@ -1,10 +1,7 @@
 -- Quiz Portal Database Schema
--- This script will create tables if they don't exist
-
 CREATE DATABASE IF NOT EXISTS quiz_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE quiz_portal;
 
--- Users table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -14,7 +11,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Quizzes table
 CREATE TABLE IF NOT EXISTS quizzes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(200) NOT NULL,
@@ -22,7 +18,6 @@ CREATE TABLE IF NOT EXISTS quizzes (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Questions table
 CREATE TABLE IF NOT EXISTS questions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   quiz_id INT NOT NULL,
@@ -35,7 +30,6 @@ CREATE TABLE IF NOT EXISTS questions (
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
 
--- Attempts table
 CREATE TABLE IF NOT EXISTS attempts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -47,7 +41,6 @@ CREATE TABLE IF NOT EXISTS attempts (
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
 
--- Answers table
 CREATE TABLE IF NOT EXISTS answers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   attempt_id INT NOT NULL,
@@ -59,7 +52,5 @@ CREATE TABLE IF NOT EXISTS answers (
   FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
 );
 
--- Seed admin user (password: admin123)
--- This will only insert if the user doesn't exist
 INSERT IGNORE INTO users (name, email, password_hash, role) VALUES
 ('Admin User', 'admin@quizportal.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
