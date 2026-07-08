@@ -1,6 +1,4 @@
 -- Quiz Portal Database Schema
--- Run this in MySQL to set up the database
-
 CREATE DATABASE IF NOT EXISTS quiz_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE quiz_portal;
 
@@ -55,5 +53,5 @@ CREATE TABLE IF NOT EXISTS answers (
 );
 
 -- Seed admin user (password: admin123)
-INSERT INTO users (name, email, password_hash, role) VALUES
+INSERT IGNORE INTO users (name, email, password_hash, role) VALUES
 ('Admin User', 'admin@quizportal.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
