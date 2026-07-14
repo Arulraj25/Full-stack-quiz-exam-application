@@ -50,12 +50,10 @@ async function connectWithRetry(retries = 30, delay = 2000) {
 
 // ✅ Middleware to check DB connection
 app.use(async (req, res, next) => {
-  // Skip DB check for health endpoint
   if (req.path === '/health') {
     return next();
   }
   
-  // If DB not ready, try to reconnect
   if (!app.locals.dbReady) {
     try {
       const connection = await pool.getConnection();
@@ -124,7 +122,6 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`📊 Using database: ${process.env.DB_NAME || 'quiz_portal'}`);
   console.log(`🔄 Environment: ${process.env.NODE_ENV || 'development'}`);
   
-  // Try to connect to database
   await connectWithRetry();
   
   if (app.locals.dbReady) {
