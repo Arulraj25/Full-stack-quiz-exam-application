@@ -234,11 +234,26 @@ jobs:
           echo "📝 Loading database schema..."
           docker-compose exec -T mysql mysql -u root -p${{ secrets.DB_PASSWORD }} quiz_portal < backend/schema.sql 2>/dev/null || echo "Schema already loaded"
           
-          # Restart backend
-          echo "🔄 Restarting backend..."
-          docker-compose restart backend
+          # Verify tables exist
+          echo "🔍 Verifying tables..."
+          docker-compose exec -T mysql mysql -u root -p${{ secrets.DB_PASSWORD }} -e "USE quiz_portal; SHOW TABLES;"
           
-          sleep 10
+          # Stop and remove backend to force restart
+          echo "🔄 Restarting backend with proper connection..."
+          docker-compose stop backend
+          docker rm quiz_backend 2>/dev/null || true
+          docker-compose up -d backend
+          
+          # Wait for backend to be ready
+          echo "⏳ Waiting for backend to be ready..."
+          for i in {1..20}; do
+            if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+              echo "✅ Backend is ready!"
+              break
+            fi
+            echo "Waiting for backend... ($i/20)"
+            sleep 5
+          done
           
           # Show status
           echo ""
