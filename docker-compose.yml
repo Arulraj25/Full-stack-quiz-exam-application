@@ -22,7 +22,7 @@ services:
       retries: 30
       
   backend:
-    image: ${DOCKER_USERNAME}/quiz-portal-backend:latest
+    build: ./backend
     container_name: quiz_backend
     restart: always
     environment:
@@ -47,7 +47,7 @@ services:
       retries: 5
 
   frontend:
-    image: ${DOCKER_USERNAME}/quiz-portal-frontend:latest
+    build: ./frontend
     container_name: quiz_frontend
     restart: always
     ports:
@@ -58,7 +58,7 @@ services:
       - backend
 
   dashboard:
-    image: ${DOCKER_USERNAME}/quiz-portal-dashboard:latest
+    build: ./dashboard
     container_name: quiz_dashboard
     restart: always
     environment:
