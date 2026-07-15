@@ -37,6 +37,13 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/quiz-portal-frontend:latest
 
+    - name: Build and push Dashboard
+      uses: docker/build-push-action@v5
+      with:
+        context: ./dashboard
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/quiz-portal-dashboard:latest
+
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -47,38 +54,68 @@ jobs:
         script: |
           # Create project directory
           mkdir -p /home/ubuntu/quiz-portal
-          
-          # Navigate to project directory
           cd /home/ubuntu/quiz-portal
           
-          # Create .env file
-          cat > .env << EOF
+          # Create .env file for backend
+          cat > .env << 'ENVEOF'
           NODE_ENV=production
           PORT=5000
           DB_HOST=mysql
-          DB_USER=root
+          DB_USER=quizuser
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          DB_NAME=${{ secrets.DB_NAME }}
+          DB_NAME=quiz_portal
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           MYSQL_ROOT_PASSWORD=${{ secrets.DB_PASSWORD }}
-          MYSQL_DATABASE=${{ secrets.DB_NAME }}
-          EOF
+          MYSQL_DATABASE=quiz_portal
+          MYSQL_USER=quizuser
+          MYSQL_PASSWORD=${{ secrets.DB_PASSWORD }}
+          ENVEOF
+          
+          # Create .env for dashboard
+          cat > dashboard.env << 'DASHENV'
+          SERVER=${{ secrets.AZURE_SERVER }}
+          DATABASE=${{ secrets.AZURE_DATABASE }}
+          USERNAME=${{ secrets.AZURE_USERNAME }}
+          PASSWORD=${{ secrets.AZURE_PASSWORD }}
+          PORT=5002
+          DASHENV
           
           # Create docker-compose.yml
-          cat > docker-compose.yml << 'EOF'
-          version: '3.8'
-          
+          cat > docker-compose.yml << 'COMPOSEEOF'
           services:
+            mysql:
+              image: mysql:8.0
+              container_name: quiz_mysql
+              restart: always
+              environment:
+                MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
+                MYSQL_DATABASE: quiz_portal
+                MYSQL_USER: quizuser
+                MYSQL_PASSWORD: ${{ secrets.DB_PASSWORD }}
+              ports:
+                - "3306:3306"
+              volumes:
+                - mysql_data:/var/lib/mysql
+                - ./backend/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+              networks:
+                - quiz-network
+              healthcheck:
+                test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${{ secrets.DB_PASSWORD }}"]
+                interval: 10s
+                timeout: 5s
+                retries: 10
+              
             backend:
               image: ${{ secrets.DOCKER_USERNAME }}/quiz-portal-backend:latest
-              container_name: quiz-backend
+              container_name: quiz_backend
               restart: always
               env_file:
                 - .env
               ports:
                 - "5000:5000"
               depends_on:
-                - mysql
+                mysql:
+                  condition: service_healthy
               networks:
                 - quiz-network
               healthcheck:
@@ -89,32 +126,27 @@ jobs:
             
             frontend:
               image: ${{ secrets.DOCKER_USERNAME }}/quiz-portal-frontend:latest
-              container_name: quiz-frontend
+              container_name: quiz_frontend
               restart: always
               ports:
-                - "3000:80"
+                - "80:80"
               networks:
                 - quiz-network
               depends_on:
                 - backend
             
-            mysql:
-              image: mysql:8.0
-              container_name: quiz-mysql
+            dashboard:
+              image: ${{ secrets.DOCKER_USERNAME }}/quiz-portal-dashboard:latest
+              container_name: quiz_dashboard
               restart: always
               env_file:
-                - .env
+                - dashboard.env
               ports:
-                - "3306:3306"
-              volumes:
-                - mysql_data:/var/lib/mysql
-                - ./backend/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+                - "5002:5002"
               networks:
                 - quiz-network
-              healthcheck:
-                test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-                timeout: 20s
-                retries: 10
+              depends_on:
+                - backend
           
           networks:
             quiz-network:
@@ -122,26 +154,110 @@ jobs:
           
           volumes:
             mysql_data:
-          EOF
+          COMPOSEEOF
           
           # Login to Docker Hub
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
           
-          # Deploy
+          # Create backend directory and schema
+          mkdir -p backend
+          
+          # Download schema.sql from repository or create it
+          cat > backend/schema.sql << 'SCHEMAEOF'
+          CREATE DATABASE IF NOT EXISTS quiz_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          USE quiz_portal;
+          
+          CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            role ENUM('admin', 'student') NOT NULL DEFAULT 'student',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS quizzes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
+            subject VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS questions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            quiz_id INT NOT NULL,
+            question_text TEXT NOT NULL,
+            option_a VARCHAR(255) NOT NULL,
+            option_b VARCHAR(255) NOT NULL,
+            option_c VARCHAR(255) NOT NULL,
+            option_d VARCHAR(255) NOT NULL,
+            correct_option CHAR(1) NOT NULL CHECK (correct_option IN ('A','B','C','D')),
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
+          );
+          
+          CREATE TABLE IF NOT EXISTS attempts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            quiz_id INT NOT NULL,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            submitted_at TIMESTAMP NULL,
+            score INT DEFAULT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
+          );
+          
+          CREATE TABLE IF NOT EXISTS answers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            attempt_id INT NOT NULL,
+            question_id INT NOT NULL,
+            selected_option CHAR(1) NULL,
+            is_correct BOOLEAN DEFAULT NULL,
+            answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (attempt_id) REFERENCES attempts(id) ON DELETE CASCADE,
+            FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+          );
+          
+          -- Seed admin user (password: password)
+          INSERT IGNORE INTO users (name, email, password_hash, role) VALUES
+          ('Admin User', 'admin@quizportal.com', '$2a$10$ZRa7/Rhu2osSdMY/JADpF.JA6tYy9Wup10QNHUVhoFx/nI6Le2Ue.', 'admin');
+          SCHEMAEOF
+          
+          # Pull images and deploy
           docker-compose pull
           docker-compose down
           docker-compose up -d
           
-          # Wait for MySQL to be ready
-          echo "Waiting for MySQL to be ready..."
+          # Wait for services to be ready
+          echo "⏳ Waiting for services to be ready..."
           sleep 30
           
-          # Initialize database schema if not already done
-          docker-compose exec -T mysql mysql -uroot -p${{ secrets.DB_PASSWORD }} -e "CREATE DATABASE IF NOT EXISTS ${{ secrets.DB_NAME }};"
+          # Show status
+          echo ""
+          echo "📊 Container Status:"
+          docker-compose ps
           
-          # Clean up
+          echo ""
+          echo "📝 Backend Logs:"
+          docker-compose logs backend --tail=20
+          
+          echo ""
+          echo "📝 Dashboard Logs:"
+          docker-compose logs dashboard --tail=20
+          
+          # Test endpoints
+          echo ""
+          echo "🧪 Testing endpoints..."
+          curl -s http://localhost:5000/health || echo "Backend health check failed"
+          echo ""
+          curl -s http://localhost:5002/api/dashboard || echo "Dashboard API check failed"
+          echo ""
+          
+          # Clean up unused images
           docker image prune -f
           
-          # Show status
-          docker-compose ps
-          docker-compose logs --tail=20
+          echo ""
+          echo "✅ Deployment Complete!"
+          echo "🌐 Frontend: http://${{ secrets.EC2_HOST }}"
+          echo "🔧 Backend API: http://${{ secrets.EC2_HOST }}:5000"
+          echo "📊 Dashboard: http://${{ secrets.EC2_HOST }}:5002"
+          echo "📧 Admin: admin@quizportal.com / password"
