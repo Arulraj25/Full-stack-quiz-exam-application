@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install base packages
+# Install ODBC driver for SQL Server
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \

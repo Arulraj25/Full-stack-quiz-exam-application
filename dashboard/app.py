@@ -5,10 +5,10 @@ import os
 app = Flask(__name__)
 
 # Azure Synapse Connection
-SERVER = os.getenv('SERVER', "quizportal-synapse-ondemand.sql.azuresynapse.net")
-DATABASE = os.getenv('DATABASE', "quizportal_db")
-USERNAME = os.getenv('USERNAME', "sqladminuser")
-PASSWORD = os.getenv('PASSWORD', "Arul_2025")
+SERVER = os.getenv('AZURE_SERVER', "quizportal-synapse-ondemand.sql.azuresynapse.net")
+DATABASE = os.getenv('AZURE_DATABASE', "quizportal_db")
+USERNAME = os.getenv('AZURE_USERNAME', "sqladminuser")
+PASSWORD = os.getenv('AZURE_PASSWORD', "Arul_2025")
 
 connection_string = (
     "DRIVER={ODBC Driver 18 for SQL Server};"
